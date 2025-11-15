@@ -6,15 +6,17 @@ export interface Family {
   parent_id: string;
   income: number;
   address: string;
-  number_of_children: number;
-  verification_status: string;
-  support_status: string;
-  created_at: string;
+  number_of_children?: number;
+  verification_status?: string;
+  support_status?: string;
+  created_at?: string;
 }
 
 const insert = BaseModel.db.prepare(`
-  INSERT INTO families (family_id, parent_id, income, address)
-  VALUES (?, ?, ?, ?)
+  INSERT INTO families (
+    family_id, parent_id, income, address,
+    number_of_children, verification_status, support_status, created_at
+  ) VALUES (?, ?, ?, ?, 0, 'pending', 'support_needed', datetime('now'))
 `);
 
 export class FamilyModel extends BaseModel {

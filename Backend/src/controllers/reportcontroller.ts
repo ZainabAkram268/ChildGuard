@@ -4,7 +4,9 @@ import { ProgressReportModel } from '../models/progressreport'; // Fixed import 
 import { NotificationModel } from '../models/notification';     // Fixed import path
 
 export class ProgressReportController {
+  
   static create(req: Request, res: Response) {
+    const db = req.app.get('db');
     const { child_id, report_date, grades, attendance } = req.body;
 
     if (!child_id || !report_date) {
