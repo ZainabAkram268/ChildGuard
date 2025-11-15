@@ -7,9 +7,22 @@ const insert = BaseModel.db.prepare(`
 `);
 
 export class ProgressReportModel extends BaseModel {
-  static create(child_id: string, data: { report_date: string; grades?: string; attendance?: number }) {
+  static create(
+    child_id: string,
+    data: {
+      report_date: string;
+      grades?: string | null;     // allow null
+      attendance?: number | null; // allow null (matches ?? null)
+    }
+  ) {
     const id = `PRG${Date.now()}`;
-    insert.run(id, child_id, data.report_date, data.grades ?? null, data.attendance ?? null);
+    insert.run(
+      id,
+      child_id,
+      data.report_date,
+      data.grades ?? null,
+      data.attendance ?? null  // now type-safe
+    );
     return id;
   }
 }
