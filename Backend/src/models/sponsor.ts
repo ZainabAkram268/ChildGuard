@@ -1,20 +1,16 @@
-// backend/src/models/Sponsor.ts
-import { BaseModel } from './BaseModels';
-import { UserModel, User } from './user';
+// src/models/sponsor.ts
+import { UserModel, User } from "./user"; // Import User
+import { BaseModel } from "./BaseModels";
 
-export interface Sponsor extends User {
-  phone?: string;
-  preferences?: string;  // JSON string
+// Define the Sponsor extension fields
+export interface SponsorExtension {
+  sponsor_id: string;
+  phone: string | null;
+  preferences: string | null; // Stored as TEXT (JSON string) in DB
 }
 
-const insertSponsor = BaseModel.db.prepare(`
-  INSERT INTO sponsors (sponsor_id, phone, preferences)
-  VALUES (?, ?, ?)
-`);
-
-const getSponsor = BaseModel.db.prepare(`
-  SELECT phone, preferences FROM sponsors WHERE sponsor_id = ?
-`);
+// Define the merged object type returned by create/find
+export type Sponsor = User & SponsorExtension;
 
 export class SponsorModel extends BaseModel {
   static create(data: {
@@ -22,37 +18,41 @@ export class SponsorModel extends BaseModel {
     email: string;
     password: string;
     phone?: string;
-    preferences?: object;
-  }): Sponsor {
-    const tx = BaseModel.db.transaction(() => {
-      const user = UserModel.create({
-        username: data.username,
-        email: data.email,
-        password: data.password,
-        role: 'sponsor',
-      });
+    preferences?: any; // array or object
+  }): Sponsor { // Explicit return type
+    this.init();
 
-      const preferencesJson = data.preferences 
-        ? JSON.stringify(data.preferences) 
-        : null;
-
-      insertSponsor.run(user.user_id, data.phone ?? null, preferencesJson);
-
-      const extra = getSponsor.get(user.user_id) as { 
-        phone?: string; 
-        preferences?: string 
-      };
-
-      return { ...user, phone: extra.phone, preferences: extra.preferences };
+    const user = UserModel.create({
+      username: data.username,
+      email: data.email,
+      password: data.password,
+      role: "sponsor",
     });
 
-    return tx();
+    // Stringify preferences to store as TEXT/JSON string in SQLite
+    const prefsJson = data.preferences ? JSON.stringify(data.preferences) : null;
+
+    const insertSponsor = this.db.prepare(`
+      INSERT INTO sponsors (sponsor_id, phone, preferences)
+      VALUES (?, ?, ?)
+    `);
+    insertSponsor.run(user.user_id, data.phone ?? null, prefsJson);
+
+    // Select the extension fields
+    const extra = this.db.prepare("SELECT sponsor_id, phone, preferences FROM sponsors WHERE sponsor_id = ?").get(user.user_id) as SponsorExtension;
+    // Merge and return
+    return { ...user, ...extra };
   }
 
-  static findById(id: string): Sponsor | null {
-    const user = UserModel.findById(id);
-    if (!user || user.role !== 'sponsor') return null;
-    const extra = getSponsor.get(id) as { phone?: string; preferences?: string };
+  static find(user_id: string): Sponsor | null { // Explicit return type
+    this.init();
+
+    const user = UserModel.findById(user_id);
+    if (!user || user.role !== "sponsor") return null;
+
+    // Select the extension fields
+    const extra = this.db.prepare("SELECT sponsor_id, phone, preferences FROM sponsors WHERE sponsor_id = ?").get(user_id) as SponsorExtension;
+    // Merge and return
     return { ...user, ...extra };
   }
 }
