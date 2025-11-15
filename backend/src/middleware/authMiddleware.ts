@@ -1,38 +1,51 @@
-import { Request, Response, NextFunction } from 'express';
-import * as jwt from 'jsonwebtoken';
+// src/middleware/authMiddleware.ts (Conceptual file)
 
-// Extend the Request object type to include the decoded user payload
-interface AuthRequest extends Request {
-    user?: { id: number; role: string };
+import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
+// Assuming JWT_SECRET is imported or defined here
+const JWT_SECRET = 'your_jwt_secret'; 
+
+// 1. Define the payload shape that your JWT carries
+interface AuthPayload {
+    user_id: string;
+    role: string;
 }
 
-// IMPORTANT: Must match the secret in server.ts and authController.ts
-const JWT_SECRET = process.env.JWT_SECRET || 'your_strong_secret_key_here'; 
+// 2. Extend the Express Request interface to include your custom property
+export interface AuthRequest extends Request {
+    // This allows you to attach user data after successful authentication
+    user?: AuthPayload; 
+}
 
-/**
- * Middleware to verify JWT token and protect routes.
- * It reads the 'Authorization' header, verifies the token, and attaches user data to req.user.
- */
-export const protect = (req: AuthRequest, res: Response, next: NextFunction) => {
-    const authHeader = req.headers.authorization;
+// 3. The actual middleware function
+export const authMiddleware = (
+    req: AuthRequest, // Use the extended type here
+    res: Response, 
+    next: NextFunction
+) => {
+    // The 'headers' property is now correctly recognized from the Express Request base type.
+    const authHeader = req.headers['authorization'];
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        return res.status(401).json({ error: 'Access denied. No token provided.' });
+    if (!authHeader) {
+        return res.status(401).json({ message: 'Authorization header missing' });
     }
 
-    const token = authHeader.split(' ')[1];
+    // Expecting "Bearer TOKEN"
+    const [scheme, token] = authHeader.split(' ');
+
+    if (scheme !== 'Bearer' || !token) {
+        return res.status(401).json({ message: 'Token format is "Bearer [token]"' });
+    }
 
     try {
-        // Verify the token using the secret key
-        const decoded = jwt.verify(token, JWT_SECRET) as { id: number; role: string; iat: number; exp: number };
-        
-        // Attach the decoded user payload (id and role) to the request
-        req.user = { id: decoded.id, role: decoded.role };
+        // Verify and decode the JWT
+        const decoded = jwt.verify(token, JWT_SECRET) as AuthPayload;
 
-        // Proceed to the next middleware or route handler
-        next();
-    } catch (err) {
-        // Handle token expiration or invalid signature
-        return res.status(401).json({ error: 'Access denied. Invalid or expired token.' });
+        // Attach the decoded user data to the request object for downstream controllers
+        req.user = decoded; 
+
+        next(); // Proceed to the next middleware or controller
+    } catch (error) {
+        return res.status(403).json({ message: 'Invalid or expired token' });
     }
 };
