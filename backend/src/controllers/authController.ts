@@ -1,70 +1,138 @@
+// src/controllers/authController.ts
 import { Request, Response } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-import { DatabaseConnection } from "../config/database";
-import { User } from "../models/User";
+import { DatabaseConnection } from "../config/database/DatabaseConnection";
+import { randomUUID } from "crypto";
+// 1. IMPORT THE USER INTERFACE: Assumes you have an interface User in "../models/user"
+import { User } from "../models/user"; 
 
+// Define a type for the user object returned from the DB for use in Auth
+// We need user_id, username, email, role, and password_hash for login validation.
+type AuthDbUser = Pick<User, 'user_id' | 'username' | 'email' | 'password_hash' | 'role'>;
+
+// Define a type for the user object returned in the response (without the hash)
+type AuthResponseUser = Omit<AuthDbUser, 'password_hash'>;
+
+// Use an environment variable in a real app
 const JWT_SECRET = "your_jwt_secret";
 
 export class AuthController {
-  static async register(req: Request, res: Response) {
-    try {
-      const db = await DatabaseConnection.getInstance();
-      const { name, email, password } = req.body;
+    // -----------------------------------------
+    // REGISTER
+    // -----------------------------------------
+    static register(req: Request, res: Response) {
+        try {
+            const db = DatabaseConnection.getInstance();
+            const { username, email, password, role, phone, address } = req.body;
 
-      const existingUser = await db.get<User>(
-        "SELECT * FROM users WHERE email = ?",
-        [email]
-      );
-      if (existingUser) return res.status(400).json({ error: "User already exists" });
+            // Validate role
+            const allowedRoles = ["parent", "sponsor", "volunteer", "admin", "case_reporter"];
+            if (!allowedRoles.includes(role)) {
+                return res.status(400).json({ error: "Invalid user role" });
+            }
 
-      const hashedPassword = await bcrypt.hash(password, 10);
+            // Check existing user (synchronous db.get)
+            const existing = db.prepare(
+                "SELECT * FROM users WHERE email = ? OR username = ?"
+            ).get(email, username);
+            
+            if (existing) return res.status(400).json({ error: "User already exists" });
 
-      const result = await db.run(
-        "INSERT INTO users (name, email, password, role) VALUES (?, ?, ?, ?)",
-        [name, email, hashedPassword, "user"]
-      );
+            // Hash password
+            const hash = bcrypt.hashSync(password, 10);
+            
+            // Generate ID
+            const user_id = `USR-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
 
-      const newUser: User = {
-        id: result.lastID!,
-        name,
-        email,
-        password: hashedPassword,
-        role: "user",
-      };
+            // Use a transaction for the two inserts (users and role-specific table)
+            const insertUserAndExtension = db.transaction(() => {
+                // 1. Insert user
+                db.prepare(
+                    `INSERT INTO users (user_id, username, email, password_hash, role)
+                     VALUES (?, ?, ?, ?, ?)`
+                ).run(user_id, username, email, hash, role);
 
-      const token = jwt.sign({ id: newUser.id, role: newUser.role }, JWT_SECRET, {
-        expiresIn: "1h",
-      });
+                // 2. Insert into the role-specific table (e.g., parents or sponsors)
+                switch (role) {
+                    case "parent":
+                        db.prepare(
+                            `INSERT INTO parents (parent_id, phone, address)
+                             VALUES (?, ?, ?)`
+                        ).run(user_id, phone ?? null, address ?? null);
+                        break;
+                    case "sponsor":
+                        const prefsJson = req.body.preferences ? JSON.stringify(req.body.preferences) : null;
+                        db.prepare(
+                            `INSERT INTO sponsors (sponsor_id, phone, preferences)
+                             VALUES (?, ?, ?)`
+                        ).run(user_id, phone ?? null, prefsJson);
+                        break;
+                    default:
+                        break;
+                }
 
-      res.status(201).json({
-        user: { id: newUser.id, name: newUser.name, email: newUser.email, role: newUser.role },
-        token,
-      });
-    } catch (err) {
-      res.status(500).json({ error: "Registration failed", details: err });
+                // 3. Select the data needed for the JWT and response body
+                return db.prepare("SELECT user_id, username, email, role FROM users WHERE user_id = ?")
+                    .get(user_id) as AuthResponseUser; // <-- FIX: Explicit Type Cast here
+            });
+
+            // newUser is now explicitly typed as AuthResponseUser, fixing errors 1 and 2.
+            const newUser = insertUserAndExtension();
+
+            // JWT (uses user_id and role, which are now correctly typed)
+            const token = jwt.sign({ user_id: newUser.user_id, role: newUser.role }, JWT_SECRET, { expiresIn: "1h" });
+
+            res.status(201).json({
+                message: "Registration successful",
+                user: newUser,
+                token,
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: "Registration failed", details: "A database or internal error occurred." });
+        }
     }
-  }
 
-  static async login(req: Request, res: Response) {
-    try {
-      const db = await DatabaseConnection.getInstance();
-      const { email, password } = req.body;
+    // -----------------------------------------
+    // LOGIN
+    // -----------------------------------------
+    static login(req: Request, res: Response) {
+        try {
+            const db = DatabaseConnection.getInstance();
+            const { email, password } = req.body;
 
-      const user = await db.get<User>("SELECT * FROM users WHERE email = ?", [email]);
-      if (!user) return res.status(400).json({ error: "User not found" });
+            // Lookup user (synchronous db.get)
+            // FIX: Explicit Type Cast for user as AuthDbUser or undefined
+            const user = db.prepare(`SELECT * FROM users WHERE email = ?`)
+                .get(email) as AuthDbUser | undefined;
+            
+            if (!user) return res.status(400).json({ error: "User not found" });
 
-      const valid = await bcrypt.compare(password, user.password);
-      if (!valid) return res.status(400).json({ error: "Invalid password" });
+            // Compare passwords (user.password_hash is now correctly typed, fixing error 3)
+            const valid = bcrypt.compareSync(password, user.password_hash);
+            if (!valid) return res.status(400).json({ error: "Invalid password" });
 
-      const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: "1h" });
+            // JWT
+            const token = jwt.sign(
+                { user_id: user.user_id, role: user.role }, // user.user_id and user.role are now correctly typed, fixing errors 4 and 5.
+                JWT_SECRET,
+                { expiresIn: "1h" }
+            );
 
-      res.json({
-        token,
-        user: { id: user.id, name: user.name, email: user.email, role: user.role },
-      });
-    } catch (err) {
-      res.status(500).json({ error: "Login failed", details: err });
+            res.json({
+                message: "Login successful",
+                token,
+                user: { 
+                    user_id: user.user_id, // Fixes error 6
+                    username: user.username, // Fixes error 7
+                    email: user.email, // Fixes error 8
+                    role: user.role, // Fixes error 9
+                } as AuthResponseUser, // Final cast ensures the response object shape is correct
+            });
+        } catch (err) {
+            console.error(err);
+            res.status(500).json({ error: "Login failed", details: "A database or internal error occurred." });
+        }
     }
-  }
 }

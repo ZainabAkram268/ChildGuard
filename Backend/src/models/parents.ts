@@ -1,20 +1,16 @@
-// backend/src/models/Parent.ts
-import { BaseModel } from './BaseModels';
-import { UserModel, User } from './user';
+// src/models/parents.ts
+import { UserModel, User } from "./user"; // Import User for better type merging
+import { BaseModel } from "./BaseModels";
 
-export interface Parent extends User {
-  phone?: string;
-  address?: string;
+// Define the Parent extension fields
+export interface ParentExtension {
+  parent_id: string;
+  phone: string | null; // Changed to match schema column type nullability
+  address: string | null; // Changed to match schema column type nullability
 }
 
-const insertParent = BaseModel.db.prepare(`
-  INSERT INTO parents (parent_id, phone, address)
-  VALUES (?, ?, ?)
-`);
-
-const getParent = BaseModel.db.prepare(`
-  SELECT p.* FROM parents p WHERE p.parent_id = ?
-`);
+// Define the merged object type returned by create/find
+export type Parent = User & ParentExtension;
 
 export class ParentModel extends BaseModel {
   static create(data: {
@@ -23,25 +19,39 @@ export class ParentModel extends BaseModel {
     password: string;
     phone?: string;
     address?: string;
-  }): Parent {
-    const tx = BaseModel.db.transaction(() => {
-      const user = UserModel.create({
-        username: data.username,
-        email: data.email,
-        password: data.password,
-        role: 'parent',
-      });
-      insertParent.run(user.user_id, data.phone ?? null, data.address ?? null);
-      const extra = getParent.get(user.user_id) as { phone?: string; address?: string };
-      return { ...user, ...extra };
+  }): Parent { // Explicit return type
+    this.init();
+
+    // create user synchronously
+    const user = UserModel.create({
+      username: data.username,
+      email: data.email,
+      password: data.password,
+      role: "parent",
     });
-    return tx();
+
+    const insertParent = this.db.prepare(`
+      INSERT INTO parents (parent_id, phone, address)
+      VALUES (?, ?, ?)
+    `);
+    // Use the null-coalescing operator ?? to ensure null is passed to DB if undefined
+    insertParent.run(user.user_id, data.phone ?? null, data.address ?? null);
+
+    // Select the extension fields. Note: The database will return NULL if the columns are empty.
+    const extra = this.db.prepare("SELECT parent_id, phone, address FROM parents WHERE parent_id = ?").get(user.user_id) as ParentExtension;
+    // Merge the user object with the parent extension data
+    return { ...user, ...extra };
   }
 
-  static findById(id: string): Parent | null {
-    const user = UserModel.findById(id);
-    if (!user || user.role !== 'parent') return null;
-    const extra = getParent.get(id) as { phone?: string; address?: string };
+  static find(user_id: string): Parent | null { // Explicit return type
+    this.init();
+
+    const user = UserModel.findById(user_id);
+    if (!user || user.role !== "parent") return null;
+
+    // Select the extension fields
+    const extra = this.db.prepare("SELECT parent_id, phone, address FROM parents WHERE parent_id = ?").get(user_id) as ParentExtension;
+    // Merge the user object with the parent extension data
     return { ...user, ...extra };
   }
 }

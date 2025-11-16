@@ -1,13 +1,25 @@
 {
   "dependencies": {
-    "bcrypt": "^6.0.0",
-    "better-sqlite3": "^12.4.1"
+    "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "helmet": "^8.1.0",
+    "jsonwebtoken": "^9.0.2",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7"
   },
   "devDependencies": {
-    "@types/bcrypt": "^6.0.0",
-    "@types/better-sqlite3": "^7.6.13",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.5",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^24.10.1",
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3"
+  },
+  "scripts": {
+    "dev": "ts-node-dev src/server.ts",
+   "build": "tsc && copy src\\config\\database\\schema.sql dist\\config\\database\\schema.sql"
   }
 }
