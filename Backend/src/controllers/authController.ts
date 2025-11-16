@@ -5,7 +5,7 @@ import jwt from "jsonwebtoken";
 import { DatabaseConnection } from "../config/database/DatabaseConnection";
 import { randomUUID } from "crypto";
 // 1. IMPORT THE USER INTERFACE: Assumes you have an interface User in "../models/user"
-import { User } from "../models/user"; 
+import { User } from "../models/User"; 
 
 // Define a type for the user object returned from the DB for use in Auth
 // We need user_id, username, email, role, and password_hash for login validation.
