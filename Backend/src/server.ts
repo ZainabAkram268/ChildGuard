@@ -1,27 +1,39 @@
-// src/server.ts (Conceptual content based on your setup)
-
+// backend/src/server.ts
 import express from 'express';
 import cors from 'cors';
-import authRoutes from './routes/authRoutes'; // Your existing auth routes
-import indexRouter from './routes/index'; // <-- NEW IMPORT
-import caseReporterRoutes from "./routes/caseReporterRoutes";
-
-
+import path from 'path';
+import { BaseModel } from './models/BaseModels.js';
+import authRoutes from './routes/authRoutes.js';
+import indexRouter from './routes/index.js';
+import caseReporterRoutes from './routes/caseReporterRoutes.js';
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+console.log('Starting server...');
+
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// 1. HOME PAGE ROUTE (Place this first)
-// The root path '/' now returns the API status JSON
-app.use('/', indexRouter); 
+// Initialize DB safely
+try {
+    BaseModel.init();
+    console.log('Database initialized successfully.');
+} catch (err) {
+    console.error('Database initialization failed:', err);
+}
 
-// 2. API ROUTES (Place these under a path prefix)
+// Serve static uploads from project root
+const uploadsPath = path.join(process.cwd(), 'public', 'uploads');
+app.use('/uploads', express.static(uploadsPath));
+console.log(`Serving static uploads from: ${uploadsPath}`);
+
+// Routes
+app.use('/', indexRouter);
 app.use('/api/auth', authRoutes);
-app.use("/case", caseReporterRoutes);
+app.use('/case', caseReporterRoutes);
 
 app.listen(PORT, () => {
     console.log(`Server running on port ${PORT}`);

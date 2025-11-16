@@ -1,21 +1,15 @@
-"use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.AuthController = void 0;
-const bcryptjs_1 = __importDefault(require("bcryptjs"));
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
-const DatabaseConnection_1 = require("../config/database/DatabaseConnection");
+import bcrypt from "bcryptjs";
+import jwt from "jsonwebtoken";
+import { DatabaseConnection } from "../config/database/DatabaseConnection";
 // Use an environment variable in a real app
 const JWT_SECRET = "your_jwt_secret";
-class AuthController {
+export class AuthController {
     // -----------------------------------------
     // REGISTER
     // -----------------------------------------
     static register(req, res) {
         try {
-            const db = DatabaseConnection_1.DatabaseConnection.getInstance();
+            const db = DatabaseConnection.getInstance();
             const { username, email, password, role, phone, address } = req.body;
             // Validate role
             const allowedRoles = ["parent", "sponsor", "volunteer", "admin", "case_reporter"];
@@ -27,7 +21,7 @@ class AuthController {
             if (existing)
                 return res.status(400).json({ error: "User already exists" });
             // Hash password
-            const hash = bcryptjs_1.default.hashSync(password, 10);
+            const hash = bcrypt.hashSync(password, 10);
             // Generate ID
             const user_id = `USR-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
             // Use a transaction for the two inserts (users and role-specific table)
@@ -56,7 +50,7 @@ class AuthController {
             // newUser is now explicitly typed as AuthResponseUser, fixing errors 1 and 2.
             const newUser = insertUserAndExtension();
             // JWT (uses user_id and role, which are now correctly typed)
-            const token = jsonwebtoken_1.default.sign({ user_id: newUser.user_id, role: newUser.role }, JWT_SECRET, { expiresIn: "1h" });
+            const token = jwt.sign({ user_id: newUser.user_id, role: newUser.role }, JWT_SECRET, { expiresIn: "1h" });
             res.status(201).json({
                 message: "Registration successful",
                 user: newUser,
@@ -73,7 +67,7 @@ class AuthController {
     // -----------------------------------------
     static login(req, res) {
         try {
-            const db = DatabaseConnection_1.DatabaseConnection.getInstance();
+            const db = DatabaseConnection.getInstance();
             const { email, password } = req.body;
             // Lookup user (synchronous db.get)
             // FIX: Explicit Type Cast for user as AuthDbUser or undefined
@@ -82,11 +76,11 @@ class AuthController {
             if (!user)
                 return res.status(400).json({ error: "User not found" });
             // Compare passwords (user.password_hash is now correctly typed, fixing error 3)
-            const valid = bcryptjs_1.default.compareSync(password, user.password_hash);
+            const valid = bcrypt.compareSync(password, user.password_hash);
             if (!valid)
                 return res.status(400).json({ error: "Invalid password" });
             // JWT
-            const token = jsonwebtoken_1.default.sign({ user_id: user.user_id, role: user.role }, // user.user_id and user.role are now correctly typed, fixing errors 4 and 5.
+            const token = jwt.sign({ user_id: user.user_id, role: user.role }, // user.user_id and user.role are now correctly typed, fixing errors 4 and 5.
             JWT_SECRET, { expiresIn: "1h" });
             res.json({
                 message: "Login successful",
@@ -105,4 +99,3 @@ class AuthController {
         }
     }
 }
-exports.AuthController = AuthController;

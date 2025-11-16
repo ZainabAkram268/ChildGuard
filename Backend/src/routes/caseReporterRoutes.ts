@@ -1,6 +1,6 @@
 // backend/src/routes/caseReporterRoutes.ts
 import { Router } from "express";
-import { CaseReporterModel } from "../models/caseReporter";
+import { CaseReporterModel } from "../models/casereporter";
 
 const router = Router();
 

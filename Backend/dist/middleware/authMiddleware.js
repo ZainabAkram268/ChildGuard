@@ -1,15 +1,9 @@
-"use strict";
 // src/middleware/authMiddleware.ts (Conceptual file)
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.authMiddleware = void 0;
-const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+import jwt from 'jsonwebtoken';
 // Assuming JWT_SECRET is imported or defined here
 const JWT_SECRET = 'your_jwt_secret';
 // 3. The actual middleware function
-const authMiddleware = (req, // Use the extended type here
+export const authMiddleware = (req, // Use the extended type here
 res, next) => {
     // The 'headers' property is now correctly recognized from the Express Request base type.
     const authHeader = req.headers['authorization'];
@@ -23,7 +17,7 @@ res, next) => {
     }
     try {
         // Verify and decode the JWT
-        const decoded = jsonwebtoken_1.default.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
         // Attach the decoded user data to the request object for downstream controllers
         req.user = decoded;
         next(); // Proceed to the next middleware or controller
@@ -32,4 +26,3 @@ res, next) => {
         return res.status(403).json({ message: 'Invalid or expired token' });
     }
 };
-exports.authMiddleware = authMiddleware;

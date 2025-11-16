@@ -1,14 +1,11 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.ParentModel = void 0;
 // src/models/parents.ts
-const user_1 = require("./user"); // Import User for better type merging
-const BaseModels_1 = require("./BaseModels");
-class ParentModel extends BaseModels_1.BaseModel {
+import { UserModel } from "./user"; // Import User for better type merging
+import { BaseModel } from "./BaseModels";
+export class ParentModel extends BaseModel {
     static create(data) {
         this.init();
         // create user synchronously
-        const user = user_1.UserModel.create({
+        const user = UserModel.create({
             username: data.username,
             email: data.email,
             password: data.password,
@@ -27,7 +24,7 @@ class ParentModel extends BaseModels_1.BaseModel {
     }
     static find(user_id) {
         this.init();
-        const user = user_1.UserModel.findById(user_id);
+        const user = UserModel.findById(user_id);
         if (!user || user.role !== "parent")
             return null;
         // Select the extension fields
@@ -36,4 +33,3 @@ class ParentModel extends BaseModels_1.BaseModel {
         return { ...user, ...extra };
     }
 }
-exports.ParentModel = ParentModel;

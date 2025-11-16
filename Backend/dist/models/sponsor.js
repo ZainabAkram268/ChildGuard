@@ -1,13 +1,10 @@
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.SponsorModel = void 0;
 // src/models/sponsor.ts
-const user_1 = require("./user"); // Import User
-const BaseModels_1 = require("./BaseModels");
-class SponsorModel extends BaseModels_1.BaseModel {
+import { UserModel } from "./user"; // Import User
+import { BaseModel } from "./BaseModels";
+export class SponsorModel extends BaseModel {
     static create(data) {
         this.init();
-        const user = user_1.UserModel.create({
+        const user = UserModel.create({
             username: data.username,
             email: data.email,
             password: data.password,
@@ -27,7 +24,7 @@ class SponsorModel extends BaseModels_1.BaseModel {
     }
     static find(user_id) {
         this.init();
-        const user = user_1.UserModel.findById(user_id);
+        const user = UserModel.findById(user_id);
         if (!user || user.role !== "sponsor")
             return null;
         // Select the extension fields
@@ -36,4 +33,3 @@ class SponsorModel extends BaseModels_1.BaseModel {
         return { ...user, ...extra };
     }
 }
-exports.SponsorModel = SponsorModel;
