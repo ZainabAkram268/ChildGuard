@@ -52,6 +52,7 @@ CREATE TABLE IF NOT EXISTS volunteers (
 );
 
 CREATE INDEX IF NOT EXISTS idx_volunteers_status ON volunteers(status);
+ALTER TABLE volunteers ADD COLUMN volunteer_status TEXT DEFAULT 'pending';
 
 CREATE TABLE IF NOT EXISTS admins (
     admin_id TEXT PRIMARY KEY,
@@ -403,10 +404,10 @@ VALUES
 ('VOL002', 'vol_sana',   'vol.sana@example.com',  '$2b$10$J9kL9kL9kL9kL9kL9kL9kOuJ9kL9kL9kL9kL9kL9kOuJ9kL9kL9kL9kL', 'volunteer'),
 ('VOL003', 'vol_omar',   'vol.omar@example.com',  '$2b$10$J9kL9kL9kL9kL9kL9kL9kOuJ9kL9kL9kL9kL9kL9kOuJ9kL9kL9kL9kL', 'volunteer');
 
-INSERT INTO volunteers (volunteer_id, phone, availability, area, status) VALUES
-('VOL001', '0300-2223334', '{"days":["Mon","Wed"],"time":"evening"}', 'Lahore', 'approved'),
-('VOL002', '0300-4445556', '{"days":["Sat"],"time":"morning"}',      'Lahore', 'pending'),
-('VOL003', '0300-6667778', NULL,                                   'Faisalabad', 'rejected');
+INSERT INTO volunteers (volunteer_id, user_id, phone, availability, area, status) VALUES
+('VOL001', 'VOL001', '0300-2223334', '{"days":["Mon","Wed"]}', 'Lahore', 'approved'),
+('VOL002', 'VOL002', '0300-4445556', '{"days":["Sat"]}', 'Lahore', 'pending'),
+('VOL003', 'VOL003', '0300-6667778', NULL, 'Faisalabad', 'rejected');
 
 -- Case Reporters (one linked, one anonymous)
 INSERT INTO case_reporters (reporter_id, user_id, phone, is_anonymous) VALUES
@@ -493,6 +494,8 @@ VALUES
 ('NOT003', 'SPR001', 'You have successfully sponsored Ayesha Khan!', 'sponsorship', 0, '2025-11-15 14:00:00'),
 ('NOT004', 'PAR002', 'Your family has been shortlisted by a sponsor.', 'application_update', 1, '2025-11-08 09:00:00');
 
+-- User can be 'suspended' even if volunteer_status is 'approved'
+UPDATE users SET status = 'suspended' WHERE user_id = 'VOL001';
 -- -----------------------------------------------------------------
 -- END 
 -- -----------------------------------------------------------------
